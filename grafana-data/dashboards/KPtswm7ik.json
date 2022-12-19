@@ -3,6 +3,7 @@
   "annotations": {
    "list": [
     {
+     "$$hashKey": "object:1369",
      "datasource": "-- Grafana --",
      "enable": true,
      "hide": false,
@@ -16,6 +17,7 @@
      "type": "tags"
     },
     {
+     "$$hashKey": "object:1370",
      "builtIn": 1,
      "datasource": "-- Grafana --",
      "enable": true,
@@ -41,12 +43,14 @@
     "dashes": false,
     "datasource": "prometheus",
     "fill": 1,
+    "fillGradient": 0,
     "gridPos": {
      "h": 7,
      "w": 24,
      "x": 0,
      "y": 0
     },
+    "hiddenSeries": false,
     "id": 3,
     "legend": {
      "avg": false,
@@ -61,6 +65,9 @@
     "linewidth": 1,
     "links": [],
     "nullPointMode": "null",
+    "options": {
+     "dataLinks": []
+    },
     "percentage": false,
     "pointradius": 5,
     "points": false,
@@ -91,6 +98,7 @@
     ],
     "thresholds": [],
     "timeFrom": null,
+    "timeRegions": [],
     "timeShift": null,
     "title": "Success Rates (6h lookback window)",
     "tooltip": {
@@ -124,7 +132,11 @@
       "min": null,
       "show": true
      }
-    ]
+    ],
+    "yaxis": {
+     "align": false,
+     "alignLevel": null
+    }
    },
    {
     "aliasColors": {},
@@ -133,12 +145,14 @@
     "dashes": false,
     "datasource": "prometheus",
     "fill": 1,
+    "fillGradient": 0,
     "gridPos": {
      "h": 7,
      "w": 24,
      "x": 0,
      "y": 7
     },
+    "hiddenSeries": false,
     "id": 4,
     "legend": {
      "avg": false,
@@ -153,6 +167,9 @@
     "linewidth": 1,
     "links": [],
     "nullPointMode": "null",
+    "options": {
+     "dataLinks": []
+    },
     "percentage": false,
     "pointradius": 5,
     "points": false,
@@ -188,6 +205,7 @@
     ],
     "thresholds": [],
     "timeFrom": null,
+    "timeRegions": [],
     "timeShift": null,
     "title": "Build/Launch Attempts (6h lookback window)",
     "tooltip": {
@@ -222,7 +240,11 @@
       "min": "0",
       "show": true
      }
-    ]
+    ],
+    "yaxis": {
+     "align": false,
+     "alignLevel": null
+    }
    },
    {
     "aliasColors": {},
@@ -231,12 +253,14 @@
     "dashes": false,
     "datasource": "prometheus",
     "fill": 1,
+    "fillGradient": 0,
     "gridPos": {
      "h": 7,
      "w": 24,
      "x": 0,
      "y": 14
     },
+    "hiddenSeries": false,
     "id": 5,
     "legend": {
      "avg": false,
@@ -251,6 +275,9 @@
     "linewidth": 1,
     "links": [],
     "nullPointMode": "null",
+    "options": {
+     "dataLinks": []
+    },
     "percentage": false,
     "pointradius": 5,
     "points": false,
@@ -286,6 +313,7 @@
     ],
     "thresholds": [],
     "timeFrom": null,
+    "timeRegions": [],
     "timeShift": null,
     "title": "Build/Launch Attempts (daily)",
     "tooltip": {
@@ -320,18 +348,22 @@
       "min": "0",
       "show": true
      }
-    ]
+    ],
+    "yaxis": {
+     "align": false,
+     "alignLevel": null
+    }
    }
   ],
   "refresh": "1m",
-  "schemaVersion": 16,
+  "schemaVersion": 22,
   "style": "dark",
   "tags": [],
   "templating": {
    "list": []
   },
   "time": {
-   "from": "now-7d",
+   "from": "now-3h",
    "to": "now"
   },
   "timepicker": {
@@ -362,14 +394,17 @@
   "timezone": "",
   "title": "Service Level Objectives",
   "uid": "KPtswm7ik",
-  "version": 7
+  "variables": {
+   "list": []
+  },
+  "version": 3
  },
  "meta": {
   "canAdmin": true,
   "canEdit": true,
   "canSave": true,
   "canStar": true,
-  "created": "2018-05-08T14:11:16Z",
+  "created": "2020-09-22T09:29:52Z",
   "createdBy": "admin",
   "expires": "0001-01-01T00:00:00Z",
   "folderId": 0,
@@ -381,9 +416,9 @@
   "provisionedExternalId": "",
   "slug": "service-level-objectives",
   "type": "db",
-  "updated": "2018-07-12T19:05:27Z",
+  "updated": "2021-06-02T20:40:13Z",
   "updatedBy": "admin",
   "url": "/d/KPtswm7ik/service-level-objectives",
-  "version": 7
+  "version": 3
  }
 }

@@ -24,14 +24,39 @@ on:
 
 # Global environment variables
 env:
-  GCLOUD_SDK_VERION: "290.0.1"
-  KUBECTL_VERSION: "v1.18.0"
-  HELM_VERSION: "v3.6.2"
-  CERT_MANAGER_VERSION: "v0.15.2"
-  GIT_COMMITTER_EMAIL: ci-user@github.local
-  GIT_COMMITTER_NAME: CI User
-  GIT_AUTHOR_EMAIL: ci-user@github.local
-  GIT_AUTHOR_NAME: CI User
+  # gcloud versions at https://cloud.google.com/sdk/docs/release-notes, update
+  # to latest when updating.
+  #
+  GCLOUD_SDK_VERION: "387.0.0"
+  # kubectl versions at https://github.com/kubernetes/kubernetes/tags, update to
+  # second latest minor for a broad compatibility range when updating.
+  #
+  KUBECTL_VERSION: "v1.23.7"
+  # helm versions at https://github.com/helm/helm/tags, use latest when
+  # updating.
+  #
+  HELM_VERSION: "v3.9.0"
+  # cert-mangaer versions at https://cert-manager.io/docs/release-notes/, update
+  # to latest when updating and make sure to read upgrade notes. "kubectl apply"
+  # will be done on CRDs but sometimes more is needed.
+  #
+  # NOTE: Updates to CERT_MANAGER_VERSION should also be done in the
+  #       test-helm-template.yaml workflow.
+  #
+  CERT_MANAGER_VERSION: "v1.8.0"
+
+  # These variables influence git directly
+  # https://git-scm.com/book/en/v2/Git-Internals-Environment-Variables#_committing
+  #
+  GIT_AUTHOR_EMAIL: 105740858+jupyterhub-bot@users.noreply.github.com
+  GIT_COMMITTER_EMAIL: 105740858+jupyterhub-bot@users.noreply.github.com
+  GIT_AUTHOR_NAME: JupterHub Bot Account
+  GIT_COMMITTER_NAME: JupterHub Bot Account
+
+  # This is required for chartpress that run docker build, to ensure that we can
+  # make use of --mount flags in RUN statements for example.
+  #
+  DOCKER_BUILDKIT: "1"
 
 jobs:
   # In this dedicated job to deploy our staging environment we build and push
@@ -44,9 +69,10 @@ jobs:
       ((github.event_name == 'push') && (github.ref == 'refs/heads/master')) ||
       ((github.event_name == 'push') && contains(github.ref, 'test-this-pr'))
     runs-on: ubuntu-20.04
-
+    # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-preventing-a-specific-failing-matrix-job-from-failing-a-workflow-run
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
-      fail-fast: false  # Do not cancel all jobs if one fails
+      fail-fast: false # Do not cancel all jobs if one fails
       matrix:
         include:
           # Now we have only one staging environment, but we have had two when
@@ -62,6 +88,15 @@ jobs:
             hub_url: https://hub.gke2.staging.mybinder.org
             chartpress_args: ""
             helm_version: ""
+            experimental: false
+
+          # - federation_member: turing-staging
+          #   binder_url: https://binder-staging.mybinder.turing.ac.uk
+          #   hub_url: https://hub-staging.mybinder.turing.ac.uk
+          #   chartpress_args: ""
+          #   helm_version: ""
+          #   # TODO: Remove this when turing-staging reliably passes
+          #   experimental: true
 
     steps:
       - name: "Stage 0: Update env vars based on job matrix arguments"
@@ -70,41 +105,40 @@ jobs:
               echo "HELM_VERSION=${{ matrix.helm_version }}" >> $GITHUB_ENV
           fi
 
-      # Action Repo: https://github.com/actions/checkout
       - name: "Stage 0: Checkout repo"
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      # Action Repo: https://github.com/actions/setup-python
-      - name: "Stage 0: Setup Python 3.8"
-        uses: actions/setup-python@v1
+      - name: "Stage 0: Setup Python"
+        uses: actions/setup-python@v4
+        id: setup-python
         with:
-          python-version: 3.8
+          python-version-file: ".python-version"
 
       # Action Repo: https://github.com/actions/cache
       - name: "Stage 0: Cache pip dependencies"
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          key: python-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/*requirements.txt') }}
 
       - name: "Stage 1: Install dependencies"
+        # --upgrade is important since we carry a cache and may risk grow very
+        # outdated otherwise.
         run: |
           pip install --upgrade setuptools pip
           pip install --upgrade -r requirements.txt
 
       # Action Repo: https://github.com/google-github-actions/setup-gcloud
       - name: "Stage 1: Install gcloud ${{ env.GCLOUD_SDK_VERION }}"
-        uses: google-github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@v1
         with:
           version: ${{ env.GCLOUD_SDK_VERION }}
 
       # Action Repo: https://github.com/Azure/setup-kubectl
       - name: "Stage 1: Install kubectl ${{ env.KUBECTL_VERSION }}"
-        uses: azure/setup-kubectl@v1
+        uses: azure/setup-kubectl@v3.1
         with:
           version: ${{ env.KUBECTL_VERSION }}
 
@@ -115,7 +149,7 @@ jobs:
 
       # Action Repo: https://github.com/sliteteam/github-action-git-crypt-unlock
       - name: "Stage 2: Unlock git-crypt secrets"
-        uses: sliteteam/github-action-git-crypt-unlock@a09ea5079c1b0e1887d4c8d7a4b20f00b5c2d06b
+        uses: sliteteam/github-action-git-crypt-unlock@8b1fa3ccc81e322c5c45fbab261eee46513fd3f8
         env:
           GIT_CRYPT_KEY: ${{ secrets.GIT_CRYPT_KEY }}
 
@@ -138,11 +172,11 @@ jobs:
 
       # Action Repo: https://github.com/nick-invision/retry
       - name: "Stage 4: Verify staging works"
-        uses: nick-invision/retry@39da88d5f7d15a96aed861dbabbe8b7443e3182a
+        uses: nick-invision/retry@3e91a01664abd3c5cd539100d10d33b9c5b68482
         with:
           timeout_minutes: 10
           max_attempts: 3
-          command: pytest -vx --numprocesses=2 --binder-url=${{ matrix.binder_url }} --hub-url=${{ matrix.hub_url }} tests/
+          command: pytest -vx --color=yes --numprocesses=2 --binder-url=${{ matrix.binder_url }} --hub-url=${{ matrix.hub_url }} tests/
 
       - name: "Stage 5: Post message to Grafana that deployment to production has started"
         run: |
@@ -166,10 +200,12 @@ jobs:
 
     runs-on: ubuntu-20.04
 
+    # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-preventing-a-specific-failing-matrix-job-from-failing-a-workflow-run
+    continue-on-error: ${{ matrix.experimental }}
     # We run this job multiple times with different parameters
     # - https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idstrategy
     strategy:
-      fail-fast: false  # Do not cancel all jobs if one fails
+      fail-fast: false # Do not cancel all jobs if one fails
       matrix:
         include:
           - federation_member: prod
@@ -177,17 +213,32 @@ jobs:
             hub_url: https://hub.gke.mybinder.org
             chartpress_args: ""
             helm_version: ""
+            experimental: false
+
           - federation_member: turing
             binder_url: https://turing.mybinder.org
             hub_url: https://hub.mybinder.turing.ac.uk
             chartpress_args: ""
             helm_version: ""
+            release_name: turing
+            cluster_name: turing-prod
+            # TODO: Remove this when turing is reliable
+            # https://github.com/jupyterhub/mybinder.org-deploy/issues/2252
+            experimental: true
+
           - federation_member: ovh
             binder_url: https://ovh.mybinder.org
             hub_url: https://hub-binder.mybinder.ovh
             # image-prefix should match ovh registry config in secrets/config/ovh.yaml
-            chartpress_args: "--push --image-prefix=3i2li627.gra7.container-registry.ovh.net/binder/ovhbhub-"
+            chartpress_args: "--push --image-prefix=3i2li627.gra7.container-registry.ovh.net/binder/mybinder-"
             helm_version: ""
+            experimental: false
+
+          - federation_member: ovh2
+            binder_url: https://ovh2.mybinder.org
+            hub_url: https://hub.ovh2.mybinder.org
+            helm_version: ""
+            experimental: false
 
     steps:
       - name: "Stage 0: Update env vars based on job matrix arguments"
@@ -197,42 +248,38 @@ jobs:
           fi
 
       - name: "Stage 0: Checkout repo"
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: "Stage 0: Setup Python 3.8"
-        uses: actions/setup-python@v1
+      - name: "Stage 0: Setup Python"
+        uses: actions/setup-python@v4
+        id: setup-python
         with:
-          python-version: 3.8
+          python-version-file: ".python-version"
 
+      # Action Repo: https://github.com/actions/cache
       - name: "Stage 0: Cache pip dependencies"
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          key: python-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/*requirements.txt') }}
 
       - name: "Stage 1: Install dependencies"
+        # --upgrade is important since we carry a cache and may risk grow very
+        # outdated otherwise.
         run: |
           pip install --upgrade setuptools pip
           pip install --upgrade -r requirements.txt
 
-      # - https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idif
       - name: "Stage 1: Install gcloud ${{ env.GCLOUD_SDK_VERION }}"
         if: matrix.federation_member == 'prod'
-        uses: google-github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@v1
         with:
           version: ${{ env.GCLOUD_SDK_VERION }}
 
-      - name: "Stage 1: Install Azure CLI"
-        if: matrix.federation_member == 'turing'
-        run: |
-          sudo apt-get update && sudo apt-get install ca-certificates curl apt-transport-https lsb-release gnupg && curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc.gpg > /dev/null && AZ_REPO=$(lsb_release -cs) && echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | sudo tee /etc/apt/sources.list.d/azure-cli.list && sudo apt-get update && sudo apt-get install azure-cli
-
       - name: "Stage 1: Install kubectl ${{ env.KUBECTL_VERSION }}"
-        uses: azure/setup-kubectl@v1
+        uses: azure/setup-kubectl@v3.1
         with:
           version: ${{ env.KUBECTL_VERSION }}
 
@@ -242,12 +289,12 @@ jobs:
           helm dependency update ./mybinder
 
       - name: "Stage 2: Unlock git-crypt secrets"
-        uses: sliteteam/github-action-git-crypt-unlock@a09ea5079c1b0e1887d4c8d7a4b20f00b5c2d06b
+        uses: sliteteam/github-action-git-crypt-unlock@8b1fa3ccc81e322c5c45fbab261eee46513fd3f8
         env:
           GIT_CRYPT_KEY: ${{ secrets.GIT_CRYPT_KEY }}
 
       # Action Repo: https://github.com/Azure/docker-login
-      - name: "Stage 3: Login to Docker regstry (OVH)"
+      - name: "Stage 3: Login to Docker registry (OVH)"
         if: matrix.federation_member == 'ovh'
         uses: azure/docker-login@v1
         with:
@@ -266,23 +313,23 @@ jobs:
           TERM: xterm
 
       - name: "Stage 4: Verify ${{ matrix.federation_member }} works"
-        uses: nick-invision/retry@39da88d5f7d15a96aed861dbabbe8b7443e3182a
+        uses: nick-invision/retry@3e91a01664abd3c5cd539100d10d33b9c5b68482
         with:
           timeout_minutes: 10
           max_attempts: 3
-          command: pytest -vx --numprocesses=2 --binder-url=${{ matrix.binder_url }} --hub-url=${{ matrix.hub_url }} tests/
+          command: pytest -vx --color=yes --numprocesses=2 --binder-url=${{ matrix.binder_url }} --hub-url=${{ matrix.hub_url }} tests/
 
   report-status:
     # This job will wait for staging-deploy to finish and report its status
     #
     # This job will only run on push events made to test-this-pr/** branches
     if: github.event_name == 'push' && contains(github.ref, 'test-this-pr')
+    environment: test-this-pr-env
     runs-on: ubuntu-latest
     steps:
       # Poll the GitHub REST API and wait for staging-deploy job to finish
       - name: Wait for staging-deploy completion
         id: staging-deploy-status
-        shell: bash
         run: |
           STATUS=""
           CONCLUSION=""
@@ -290,46 +337,45 @@ jobs:
           while [ "$STATUS" != "completed" ]; do
             RESPONSE=$(curl --silent --request GET \
               --url 'https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs' \
-              --header 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' \
+              --header 'Authorization: token ${{ secrets.jupyterhub_bot_pat }}' \
               --header 'Accept: application/vnd.github.v3+json')
 
-            STATUS=$(echo $RESPONSE | jq -r '.jobs[] | select(.name=="staging-deploy") | .status')
+            STATUS=$(echo $RESPONSE | jq -r '.jobs[] | select(.name | startswith("staging-deploy")) | .status')
             echo "Status: $STATUS"
 
             if [[ "$STATUS" == "completed" ]]; then
-              CONCLUSION=$(echo $RESPONSE | jq -r '.jobs[] | select(.name=="staging-deploy") | .conclusion')
+              CONCLUSION=$(echo $RESPONSE | jq -r '.jobs[] | select(.name | startswith("staging-deploy")) | .conclusion')
               echo "Conclusion: $CONCLUSION"
             else
               sleep 30s
             fi
           done
 
-          echo "::set-output name=status::$STATUS"
-          echo "::set-output name=conclusion::$CONCLUSION"
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "conclusion=$CONCLUSION" >> $GITHUB_OUTPUT
 
       - name: Set PR number as variable
         id: get-pr-number
-        shell: bash
         run: |
           PR_NUM=$(echo ${{ github.ref }} | awk -F'/' '{print $NF}')
-          echo "::set-output name=prnum::$PR_NUM"
+          echo "prnum=$PR_NUM" >> $GITHUB_OUTPUT
 
       - name: Comment on PR with Job Status and delete the test branch
         if: ${{ steps.staging-deploy-status.outputs.status }} == 'completed'
-        uses: actions/github-script@v4.0.2
+        uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.jupyterhub_bot_pat }}
           script: |
             var JOB_STATUS = process.env.JOB_STATUS;
             var PR_NUMBER = process.env.PR_NUMBER;
 
-            github.git.deleteRef({
+            github.rest.git.deleteRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
               ref: `heads/test-this-pr/${PR_NUMBER}`
             })
 
-            github.issues.createComment({
+            github.rest.issues.createComment({
               issue_number: PR_NUMBER,
               owner: context.repo.owner,
               repo: context.repo.repo,

@@ -13,10 +13,10 @@ jobs:
       (github.event.issue.pull_request != null) &&
       contains(github.event.comment.body, '/test-this-pr') &&
       contains(
-        github.event.comment.author_association,
-        ['OWNER', 'COLLABORATOR', 'MEMBER']
+        fromJSON('["OWNER", "COLLABORATOR", "MEMBER"]'),
+        github.event.comment.author_association
       )
     steps:
       - uses: sgibson91/test-this-pr-action@main
         with:
-          access_token: ${{ secrets.TEST_THIS_PR_ACCESS_TOKEN }}
+          access_token: ${{ secrets.jupyterhub_bot_pat }}

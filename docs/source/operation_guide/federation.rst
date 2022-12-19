@@ -7,13 +7,14 @@ The mybinder.org Federation
 The following table lists BinderHub deployments in the mybinder.org
 federation, along with the status of each. For more information about
 the BinderHub federation, who is in it, how to join it, etc, see
-`the BinderHub federation page <https://binderhub.readthedocs.io/en/latest/federation/federation.html>`_.
+`the MyBinder federation page <https://mybinder.readthedocs.io/en/latest/about/federation.html>`_.
 
 ==========================  ========  ===============  ==============  =============== =====
   URL                       Response  Docker registry  JupyterHub API  User/Build Pods Quota
 ==========================  ========  ===============  ==============  =============== =====
 gke.mybinder.org
 ovh.mybinder.org
+ovh2.mybinder.org
 gesis.mybinder.org
 turing.mybinder.org
 ==========================  ========  ===============  ==============  =============== =====
@@ -24,6 +25,7 @@ turing.mybinder.org
    var fedUrls = [
        "https://gke.mybinder.org",
        "https://ovh.mybinder.org",
+       "https://ovh2.mybinder.org",
        "https://gesis.mybinder.org",
        "https://turing.mybinder.org",
    ]

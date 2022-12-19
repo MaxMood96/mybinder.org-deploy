@@ -1,29 +1,37 @@
 import asyncio
+import datetime
 import json
 import math
 import os
 import random
 import sys
-
 from hashlib import blake2b
 
+import prometheus_client
 import tornado
 import tornado.ioloop
-import tornado.web
 import tornado.options
-from tornado.ioloop import IOLoop
-from tornado.log import app_log
+import tornado.web
+from prometheus_client import Gauge
 from tornado import options
-
 from tornado.httpclient import AsyncHTTPClient, HTTPError, HTTPRequest
 from tornado.httputil import HTTPHeaders
+from tornado.ioloop import IOLoop
+from tornado.log import app_log
 from tornado.web import RequestHandler
-
 
 # Config for local testing
 CONFIG = {
-    "check": {"period": 10, "jitter": 0.1, "retries": 5, "timeout": 2},
+    "check": {
+        "period": 10,
+        "jitter": 0.1,
+        "retries": 5,
+        "timeout": 2,
+        "failed_period": 300,
+    },
     "load_balancer": "rendezvous",  # or "random"
+    "pod_headroom": 10,  # number of available slots to consider a member 'available'
+    "host_cookie_age_hours": 4,
     "hosts": {
         "gke": dict(
             url="https://gke.mybinder.org",
@@ -50,10 +58,15 @@ CONFIG = {
 
 
 def get_config(config_path):
-    app_log.info("Using config from '{}'.".format(config_path))
+    app_log.info(f"Using config from '{config_path}'.")
+    config = CONFIG.copy()
 
     with open(config_path) as f:
-        config = json.load(f)
+        config.update(json.load(f))
+
+    # merge default config
+    for key, value in CONFIG["check"].items():
+        config["check"].setdefault(key, value)
 
     for h in list(config["hosts"].keys()):
         # Remove empty entries from CONFIG["hosts"], these can happen because we
@@ -84,6 +97,11 @@ class FailedCheck(Exception):
     These checks are considered failures and not retried
     until the next interval.
     """
+
+    def __init__(self, msg, reason):
+        self.msg = msg
+        self.reason = reason
+
 
 def blake2b_hash_as_int(b):
     """Compute digest of the bytes `b` using the Blake2 hash function.
@@ -120,6 +138,37 @@ def cache_key(uri):
         key = key.rsplit("/", maxsplit=1)[0]
 
     return key
+
+
+# metrics
+
+HEALTH = Gauge(
+    "federation_health",
+    "Overall health check status for each member: 1 = healthy, 0 = unhealthy."
+    " 'member' is the federation member."
+    " 'reason' is the check that failed, if unhealthy.",
+    ["member", "reason"],
+)
+
+HEALTH_CHECK = Gauge(
+    "federation_health_check",
+    "Individual health check status for each member: 1 = healthy, 0 = unhealthy."
+    " 'member' is the federation member."
+    " 'check' is the name of the check.",
+    ["member", "check"],
+)
+
+REDIRECTS = Gauge(
+    "federation_redirect_count",
+    "Number of requests routed to each member." " 'member' is the federation member.",
+    ["member", "reason"],
+)
+
+
+class MetricsHandler(RequestHandler):
+    async def get(self):
+        self.set_header("Content-Type", prometheus_client.CONTENT_TYPE_LATEST)
+        self.write(prometheus_client.generate_latest(prometheus_client.REGISTRY))
 
 
 class ProxyHandler(RequestHandler):
@@ -188,9 +237,24 @@ class RedirectHandler(RequestHandler):
 
     def prepare(self):
         # copy hosts config in case it changes while we are iterating over it
-        hosts = dict(self.settings["hosts"])
-        self.host_names = [c["url"] for c in hosts.values() if c["weight"] > 0]
-        self.host_weights = [c["weight"] for c in hosts.values() if c["weight"] > 0]
+        hosts = dict(self.settings["hosts"])  # make a copy
+        if not hosts:
+            # no healthy hosts, allow routing to unhealthy 'prime' host only
+            hosts = {
+                key: host for key, host in CONFIG["hosts"].items() if host.get("prime")
+            }
+            app_log.warning(
+                f"Using unhealthy prime host(s) {list(hosts)} because zero hosts are healthy"
+            )
+        self.hosts = hosts
+        self.hosts_by_url = {}  # dict of {"https://gke.mybinder.org": "gke"}
+        self.host_names = []  # ordered list of ["gke"]
+        self.host_weights = []  # ordered list of numerical weights
+        for name, host_cfg in hosts.items():
+            if host_cfg["weight"] > 0:
+                self.host_names.append(name)
+                self.host_weights.append(host_cfg["weight"])
+                self.hosts_by_url[host_cfg["url"]] = name
 
         # Combine hostnames and weights into one list
         self.names_and_weights = list(zip(self.host_names, self.host_weights))
@@ -203,21 +267,34 @@ class RedirectHandler(RequestHandler):
         path = self.request.path
         uri = self.request.uri
 
-        host_name = self.get_cookie("host")
+        host_url = self.get_cookie("host")
+
         # make sure the host is a valid choice and considered healthy
-        if host_name not in self.host_names:
+        host_name = self.hosts_by_url.get(host_url)
+        if host_name is None:
             if self.load_balancer == "rendezvous":
                 host_name = rendezvous_rank(self.names_and_weights, cache_key(path))[0]
             # "random" is our default or fall-back
             else:
-                host_name = random.choices(self.host_names, self.host_weights)[0]
+                host_name = random.choices(self.host_keys, self.host_weights)[0]
+            host_url = self.hosts[host_name]["url"]
+            reason = "load_balancer"
+        else:
+            reason = "cookie"
 
-        self.set_cookie("host", host_name, path=path)
+        REDIRECTS.labels(member=host_name, reason=reason).inc()
+        self.set_cookie(
+            "host",
+            host_url,
+            path=path,
+            expires=datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(hours=CONFIG["host_cookie_age_hours"]),
+        )
 
         # do we sometimes want to add this url param? Not for build urls, at least
-        # redirect = url_concat(host_name + uri, {'binder_launch_host': 'https://mybinder.org/'})
-        redirect = host_name + uri
-        app_log.info("Redirecting {} to {}".format(path, host_name))
+        # redirect = url_concat(host_url + uri, {'binder_launch_host': 'https://mybinder.org/'})
+        redirect = host_url + uri
+        app_log.info(f"Redirecting {path} to {host_url}")
         self.redirect(redirect, status=307)
 
 
@@ -234,7 +311,7 @@ class ActiveHostsHandler(RequestHandler):
 async def health_check(host, active_hosts):
     check_config = CONFIG["check"]
     all_hosts = CONFIG["hosts"]
-    app_log.info("Checking health of {}".format(host))
+    app_log.info(f"Checking health of {host}")
 
     client = AsyncHTTPClient()
     try:
@@ -243,35 +320,68 @@ async def health_check(host, active_hosts):
                 # TODO we could use `asyncio.gather()` and fetch health and versions in parallel
                 # raises an `HTTPError` if the request returned a non-200 response code
                 # health url returns 503 if a (hard check) service is unhealthy
-                response = await client.fetch(
-                    all_hosts[host]["health"], request_timeout=check_config["timeout"]
-                )
-                health = json.loads(response.body)
-                for check in health["checks"]:
-                    # pod quota is a soft check
-                    if check["service"] == "Pod quota":
-                        if not check["ok"]:
-                            raise FailedCheck(
-                                "{} is over its quota: {}".format(host, check)
-                            )
-                        break
+
                 # check versions
+                # run this first, because it updates the prime version to check against,
+                # and we don't want to skip that if the prime cluster is otherwise unhealthy
                 response = await client.fetch(
                     all_hosts[host]["versions"], request_timeout=check_config["timeout"]
                 )
                 versions = json.loads(response.body)
                 # if this is the prime host store the versions so we can compare to them later
                 if all_hosts[host].get("prime", False):
-                    CONFIG["versions"] = versions
+                    old_versions = CONFIG.get("versions", None)
+                    if old_versions != versions:
+                        app_log.info(
+                            f"Updating prime versions {old_versions}->{versions}"
+                        )
+                        CONFIG["versions"] = versions
                 # check if this cluster is on the same versions as the prime
                 # w/o information about the prime's version we allow each
                 # cluster to be on its own versions
                 if versions != CONFIG.get("versions", versions):
+                    HEALTH_CHECK.labels(member=host, check="versions").set(0)
                     raise FailedCheck(
                         "{} has different versions ({}) than prime ({})".format(
                             host, versions, CONFIG["versions"]
-                        )
+                        ),
+                        reason="versions",
                     )
+                else:
+                    HEALTH_CHECK.labels(member=host, check="versions").set(1)
+
+                # check health
+                response = await client.fetch(
+                    all_hosts[host]["health"], request_timeout=check_config["timeout"]
+                )
+                health = json.loads(response.body)
+                for check in health["checks"]:
+                    HEALTH_CHECK.labels(member=host, check=check["service"]).set(
+                        int(check["ok"])
+                    )
+
+                for check in health["checks"]:
+                    if not check["ok"]:
+                        raise FailedCheck(
+                            f"{host} unhealthy: {check}", reason=check["service"]
+                        )
+                    if (
+                        check["service"] == "Pod quota"
+                        and check["quota"] is not None
+                        and CONFIG["pod_headroom"]
+                    ):
+                        # apply headroom so we don't hit the hard pod limit after redirecting
+                        if (
+                            check["total_pods"] + CONFIG["pod_headroom"]
+                            >= check["quota"]
+                        ):
+                            check["ok"] = False
+                            raise FailedCheck(
+                                f"{host} is approaching pod quota: {check['total_pods']}/{check['quota']}",
+                                reason=check["service"],
+                            )
+
+                        break
             except FailedCheck:
                 # don't retry failures such as quotas/version checks
                 # those aren't likely to change in 1s
@@ -290,39 +400,30 @@ async def health_check(host, active_hosts):
     # any kind of exception means the host is unhealthy
     except Exception as e:
         app_log.warning(f"{host} is unhealthy: {e}")
+        if isinstance(e, FailedCheck):
+            reason = e.reason
+        else:
+            reason = "unknown"
+        HEALTH.labels(member=host, reason=reason).set(0)
         if host in active_hosts:
-            # prime hosts are never removed, they always get traffic and users
-            # will see what ever healthy or unhealthy state they are in
-            # this protects us from the federation ending up with zero active
-            # hosts because of a glitch somewhere in the health checks
-            if all_hosts[host].get("prime", False):
-                app_log.warning(
-                    "{} has NOT been removed because it is a prime ({})".format(
-                        host, str(e)
-                    )
-                )
-
-            else:
-                # remove the host from the rotation for a while
-                active_hosts.pop(host)
-                app_log.warning(f"{host} has been removed from the rotation")
+            # remove the host from the rotation for a while
+            # prime hosts may still receive traffic when unhealthy
+            # _if_ all other hosts are also unhealthy
+            active_hosts.pop(host)
+            app_log.warning(f"{host} has been removed from the rotation")
 
         # wait longer than usual to check unhealthy host again
-        jitter = check_config["jitter"] * (0.5 - random.random())
-        IOLoop.current().call_later(
-            30 * (1 + jitter) * check_config["period"], health_check, host, active_hosts
-        )
-
+        period = check_config["failed_period"]
     else:
+        HEALTH.labels(member=host, reason="").set(1)
         if host not in active_hosts:
             active_hosts[host] = all_hosts[host]
-            app_log.warning("{} has been added to the rotation".format(host))
+            app_log.warning(f"{host} has been added to the rotation")
+        period = check_config["period"]
 
-        # schedule ourselves to check again later
-        jitter = check_config["jitter"] * (0.5 - random.random())
-        IOLoop.current().call_later(
-            (1 + jitter) * check_config["period"], health_check, host, active_hosts
-        )
+    # schedule ourselves to check again later
+    jitter = check_config["jitter"] * (0.5 - random.random())
+    IOLoop.current().call_later((1 + jitter) * period, health_check, host, active_hosts)
 
 
 def make_app():
@@ -359,6 +460,7 @@ def make_app():
                 {"url": "https://static.mybinder.org/badge.svg", "permanent": True},
             ),
             (r"/active_hosts", ActiveHostsHandler, {"active_hosts": hosts}),
+            (r"/metrics", MetricsHandler),
             (r".*", ProxyHandler, {"host": prime_host}),
         ],
         hosts=hosts,
@@ -367,9 +469,7 @@ def make_app():
 
     # start monitoring all our potential hosts
     for hostname in hosts:
-        IOLoop.current().call_later(
-            CONFIG["check"]["period"], health_check, hostname, hosts
-        )
+        IOLoop.current().add_callback(health_check, hostname, hosts)
 
     return app
 

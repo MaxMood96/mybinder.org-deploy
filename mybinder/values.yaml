@@ -1,3 +1,17 @@
+# values ref: https://github.com/yuvipanda/cryptnono/blob/main/cryptnono/values.yaml
+cryptnono:
+  enabled: true
+  tolerations:
+    # deploy anti-cryptomining cryptnono on all nodes
+    - effect: NoSchedule
+      key: hub.jupyter.org/dedicated
+      operator: Equal
+      value: user
+    - effect: NoSchedule
+      key: hub.jupyter.org_dedicated
+      operator: Equal
+      value: user
+
 imagePullSecrets:
 
 tags: {}
@@ -5,7 +19,7 @@ tags: {}
 etcJupyter:
   jupyter_notebook_config.json:
     NotebookApp:
-      allow_origin: '*'
+      allow_origin: "*"
       tornado_settings:
         trust_xheaders: true
       # shutdown the server after no activity
@@ -25,11 +39,9 @@ etcJupyter:
       # when people leave a notebook open and wander off
       cull_connected: true
 
+# values ref: https://github.com/jupyterhub/binderhub/blob/main/helm-chart/binderhub/values.yaml
 binderhub:
-
   replicas: 2
-  pdb:
-    minAvailable: 1
 
   resources:
     requests:
@@ -56,6 +68,7 @@ binderhub:
         - 1094 # xroot
         - 1095 # xroot
         - 16286 # Wolfram Engine on-demand licensing
+        - 4001 # IPFS
       cidr: 0.0.0.0/0
     ingress:
       bannedIps: []
@@ -66,6 +79,9 @@ binderhub:
       # They should be strings that will match "^<org-name>/<repo-name>.*"
       banned_specs:
         # e.g. '^org/repo.*'
+        - .*xmrig.*
+        - ^a2nk/.*
+        - ^imhajes/.*
         - ^ines/spacy-binder.*
         - ^soft4voip/rak.*
         - ^hmharshit/cn-ait.*
@@ -77,35 +93,87 @@ binderhub:
         # it was created the day GuitarsAI was blocked and does the same thing
         - ^ferarussia/.*
       high_quota_specs:
-        - ^jupyterlab/.*
-        - ^jupyter/.*
-        - ^jupyterhub/.*
-        - ^jupyter-widgets/.*
+        []
+        # - ^jupyterlab/.*
+        # - ^jupyter/.*
+        # - ^jupyterhub/.*
+        # - ^jupyter-widgets/.*
       spec_config:
         - pattern: ^ipython/ipython-in-depth.*
           config:
-            quota: 128
-      # - pattern: ^github-owner/github-repo-prefix.*
-      #   # YYYY-MM-DD of workshop
-      #   config:
-      #     quota: 123
+            quota: 100
+        - pattern: ^petlja/.*
+          config:
+            quota: 50
+        # - pattern: ^github-owner/github-repo-prefix.*
+        #   # YYYY-MM-DD of workshop
+        #   config:
+        #     quota: 123
+
+        # https://github.com/jupyterhub/mybinder.org-deploy/issues/2360
+        - pattern: ^comet-licsar/licsbas.*
+          # 2022-11-17
+          config:
+            quota: 500
+        - pattern: ^andwatson/coseismic_practical.*
+          # 2022-11-17
+          config:
+            quota: 500
+        - pattern: ^andwatson/interseismic_practical.*
+          # 2022-11-17
+          config:
+            quota: 500
+        - pattern: ^andwatson/volcano_practical.*
+          # 2022-11-18
+          config:
+            quota: 500
+        - pattern: ^matthew-gaddes/insar_workshop.*
+          # 2022-11-18
+          config:
+            quota: 500
+        - pattern: ^GenericMappingTools/egu22pygmt.*
+          # 2022-11-18
+          config:
+            quota: 500
 
     GitRepoProvider:
       banned_specs:
+        - ^(git|https?)%3A%2F%2Fgithub.com%2Fa2nk%2F.*
         - ^https%3A%2F%2Fbitbucket.org%2Fnikiubel%2Fnikiubel.bitbucket.io.git/.*
         - ^https%3A%2F%2Fjovian.ml%2Fapi%2Fgit%2F.*
         - ^https%3A%2F%2Fframagit.org%2FCecGhesq%2Flic_mdf_nsi_1.*
         - ^(git|https?)%3A%2F%2Fnotabug.org%2FulslcuRux3Y%2F.*
+        - ^(git|https?)%3A%2F%2Fgitlab.com%2Fjasmt507%2F.*
+        - ^(git|https?)%3A%2F%2Fgitlab.com%2Fh4j3s1978%2F.*
+        - .*%2Fabooz.*
+
+    GitLabRepoProvider:
+      banned_specs:
+        - ^h4j3s1978%2F.*
+        - ^jasmt507%2F.*
+        - .*%2Fabooz.*
+      spec_config: []
+
     BinderHub:
       use_registry: true
-      build_image: quay.io/jupyterhub/repo2docker:2021.08.0-8.gf1d01b6
+      build_image: quay.io/jupyterhub/repo2docker:2022.10.0-67.gab4c4f2
       per_repo_quota: 100
       per_repo_quota_higher: 200
       build_memory_limit: "3G"
       build_memory_request: "1G"
+      cors_allow_origin: "*"
 
       banner_message: |
-        <div style="text-align: center;">Thanks to <a href="https://cloud.google.com/">Google Cloud</a>, <a href="https://www.ovh.com/">OVH</a>, <a href="https://notebooks.gesis.org">GESIS Notebooks</a> and the <a href="https://turing.ac.uk">Turing Institute</a> for supporting us! 🎉</div>
+        <div style="display:flex;align-items:center;">
+          <div style="flex:1;text-align:center;">
+            Thanks to <a href="https://cloud.google.com/">Google Cloud</a>, <a href="https://www.ovh.com/">OVH</a>, <a href="https://notebooks.gesis.org">GESIS Notebooks</a> and the <a href="https://turing.ac.uk">Turing Institute</a> for supporting us! 🎉
+          </div>
+          <a class="btn" style="width:fit-content;height:fit-content;padding:10px;background-color:#e66581;color:white;font-weight:bold;margin:-8px 0px;"
+          onmouseover="this.style.backgroundColor='#d15b75'" onmouseout="this.style.backgroundColor='#e66581'"
+          href="https://numfocus.salsalabs.org/donate-to-binder" target="_blank">
+            🤍 Donate to mybinder.org!
+          </a>
+        </div>
       about_message: |
         <p>mybinder.org is public infrastructure operated by the <a href="https://jupyterhub-team-compass.readthedocs.io/en/latest/team.html#binder-team">Binder Project team</a>.<br /><br />
         The Binder Project is a member of <a href="https://jupyter.org">Project Jupyter</a>, which is a fiscally
@@ -125,6 +193,11 @@ binderhub:
           console.log("Loading Matomo tracking, since Do Not Track is off");
             var _paq = _paq || [];
             /* tracker methods like "setCustomDimension" should be called before "trackPageView" */
+            // this is matomo's own respect-DoNotTrack
+            // should be redundant, but good to be extra explicit
+            _paq.push(["setDoNotTrack", true]);
+            // disable tracking cookies
+            _paq.push(["disableCookies"]);
             _paq.push(['trackPageView']);
             (function() {
               var u="//" + window.location.hostname + "/matomo/";
@@ -167,9 +240,6 @@ binderhub:
   service:
     type: ClusterIP
 
-  cors: &cors
-    allowOrigin: '*'
-
   ingress:
     enabled: true
     annotations:
@@ -198,8 +268,6 @@ binderhub:
       enabled: false
 
   jupyterhub:
-    custom:
-      cors: *cors
     cull:
       # cull every 11 minutes so it is out of phase
       # with the proxy check-routes interval of five minutes
@@ -224,10 +292,20 @@ binderhub:
           c.KubeSpawner.allow_privilege_escalation = False
         noAuthMetrics: |
           c.JupyterHub.authenticate_prometheus = False
+      config:
+        BinderSpawner:
+          cors_allow_origin: "*"
+        JupyterHub:
+          # only serve the hub's API, not full UI
+          hub_routespec: "/hub/api/"
+        Proxy:
+          # default-route to our nginx "Binder not found" service
+          extra_routes:
+            "/": "http://proxy-patches"
       service:
         annotations:
-          prometheus.io/scrape: 'true'
-          prometheus.io/path: '/hub/metrics'
+          prometheus.io/scrape: "true"
+          prometheus.io/path: "/hub/metrics"
     proxy:
       service:
         type: ClusterIP
@@ -255,7 +333,7 @@ binderhub:
       annotations:
         ingress.kubernetes.io/proxy-body-size: 64m
         kubernetes.io/ingress.class: nginx
-        kubernetes.io/tls-acme: 'true'
+        kubernetes.io/tls-acme: "true"
     scheduling:
       userScheduler:
         enabled: true
@@ -266,6 +344,29 @@ binderhub:
         enabled: true
         # replicas set in config/<deployment>
     singleuser:
+      cmd:
+        - python3
+        - "-c"
+        - |
+          import os
+          import sys
+
+          try:
+              import jupyterlab
+              major = int(jupyterlab.__version__.split(".", 1)[0])
+          except Exception:
+              have_lab = False
+          else:
+              have_lab = major >= 3
+
+          if have_lab:
+              # if recent-enough lab is available, make it the default UI
+              sys.argv.insert(1, "--NotebookApp.default_url=/lab/")
+
+          # launch the notebook server
+          os.execvp("jupyter-notebook", sys.argv)
+      # clear singleuser.defaultUrl config from chart
+      defaultUrl:
       cloudMetadata:
         # we do this in our own network policy
         blockWithIptables: false
@@ -302,15 +403,17 @@ binderhub:
             - name: EGRESS_BANDWIDTH
               value: 1mbit
           securityContext:
-          # capabilities.add seems to be disabled
-          # by the `runAsUser: 1000` in the pod-level securityContext
-          # unless we explicitly run as root
+            # capabilities.add seems to be disabled
+            # by the `runAsUser: 1000` in the pod-level securityContext
+            # unless we explicitly run as root
             runAsUser: 0
             capabilities:
               add:
                 - NET_ADMIN
 
+# values ref: https://github.com/kubernetes/ingress-nginx/blob/main/charts/ingress-nginx/values.yaml
 ingress-nginx:
+  enabled: true
   rbac:
     create: true
   defaultBackend:
@@ -359,19 +462,20 @@ ingress-nginx:
       enabled: true
       service:
         annotations:
-          prometheus.io/scrape: 'true'
-          prometheus.io/port: '10254'
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "10254"
     service:
       # Preserve client IPs
       externalTrafficPolicy: Local
 
 redirector:
+  enabled: false
   nodeSelector: {}
   redirects: []
   ingress:
     annotations:
       kubernetes.io/ingress.class: nginx
-      kubernetes.io/tls-acme: 'true'
+      kubernetes.io/tls-acme: "true"
     tls:
       secretName: kubelego-tls-redirector
 
@@ -382,16 +486,22 @@ static:
   ingress:
     annotations:
       kubernetes.io/ingress.class: nginx
-      kubernetes.io/tls-acme: 'true'
+      kubernetes.io/tls-acme: "true"
     tls:
       secretName: kubelego-tls-static
 
+# values ref: https://github.com/grafana/helm-charts/blob/main/charts/grafana/values.yaml
 grafana:
+  enabled: true
   ingress:
     enabled: true
     annotations:
       kubernetes.io/ingress.class: nginx
-      kubernetes.io/tls-acme: 'true'
+      kubernetes.io/tls-acme: "true"
+  # deploymentStrategy.type is set to Recreate as we have storage that can only
+  # be attached once, we can't have two replicas as RollingUpdate leads to.
+  deploymentStrategy:
+    type: Recreate
   persistence:
     enabled: true
     size: 1Gi
@@ -410,16 +520,13 @@ grafana:
     security:
       allow_embedding: true
 
+# values ref: https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus/values.yaml
 prometheus:
-  nodeExporter:
-    updateStrategy:
-      type: RollingUpdate
+  enabled: true
   alertmanager:
     enabled: false
-  pushgateway:
+  prometheus-pushgateway:
     enabled: false
-  rbac:
-    create: true
   server:
     podLabels:
       # needs access to the Hub API
@@ -433,22 +540,20 @@ prometheus:
       enabled: true
       annotations:
         kubernetes.io/ingress.class: nginx
-        kubernetes.io/tls-acme: 'true'
+        kubernetes.io/tls-acme: "true"
+
+  # make sure we collect metrics on pods by app/component at least
+  kube-state-metrics:
+    metricLabelsAllowlist:
+      - pods=[app,component]
+      - nodes=[*]
 
 proxyPatches:
-  image: "jupyterhub/mybinder.org-proxy-patches:set-by-chartpress"
-  nodeSelector: {}
   enabled: true
-  interval: 60
-  routes:
-    /user: service:proxy-patches
-    # limit hub to only api requests and health checks
-    /hub/api: service:hub
-    /hub/health: service:hub
-    /hub: service:proxy-patches
+  nodeSelector: {}
 
 matomo:
-  enabled: true
+  enabled: false
   nodeSelector: {}
   resources: {}
   replicas: 1
@@ -460,17 +565,17 @@ matomo:
     tables_prefix: matomo_
 
 gcsProxy:
-  enabled: true
+  enabled: false
   replicas: 1
   nodeSelector: {}
 
 analyticsPublisher:
-  enabled: true
+  enabled: false
   events:
     logName: binderhub-events-text
   image:
     name: jupyterhub/mybinder.org-analytics-publisher
-    tag: 'set-by-chartpress'
+    tag: "set-by-chartpress"
   cloudCosts:
     # All billing info goes into same bucket in prod, to which staging has access
     enabled: true
@@ -488,13 +593,15 @@ federationRedirect:
   enabled: false
   image:
     name: jupyterhub/mybinder.org-federation-redirect
-    tag: 'set-by-chartpress'
+    tag: "set-by-chartpress"
   check:
-    period: 10
+    period: 15
     jitter: 0.1
     retries: 5
-    timeout: 2
+    timeout: 5
+    failed_period: 90
   load_balancer: "rendezvous"
+  pod_headroom: 10
   hosts:
     gke:
       prime: true
@@ -504,17 +611,23 @@ federationRedirect:
       versions: https://gke.mybinder.org/versions
     gesis:
       url: https://gesis.mybinder.org
-      weight: 100
+      weight: 0
       health: https://gesis.mybinder.org/health
       versions: https://gesis.mybinder.org/versions
     ovh:
       url: https://ovh.mybinder.org
-      weight: 60
+      weight: 100
       health: https://ovh.mybinder.org/health
       versions: https://ovh.mybinder.org/versions
+    ovh2:
+      url: https://ovh2.mybinder.org
+      weight: 100
+      health: https://ovh2.mybinder.org/health
+      versions: https://ovh2.mybinder.org/versions
     turing:
       url: https://turing.mybinder.org
-      weight: 100
+      # https://github.com/jupyterhub/mybinder.org-deploy/issues/2252#issuecomment-1295141310
+      weight: 0
       health: https://turing.mybinder.org/health
       versions: https://turing.mybinder.org/versions
   nodeSelector: {}

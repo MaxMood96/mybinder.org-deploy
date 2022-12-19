@@ -24,3 +24,8 @@ variable "sql_tier" {
   default     = "db-f1-micro"
 }
 
+variable "federation_members" {
+  type        = list(any)
+  description = "List of federation members by name"
+  default     = []
+}

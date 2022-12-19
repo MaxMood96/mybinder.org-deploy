@@ -8,12 +8,11 @@ coreNodeSelector: &coreNodeSelector
 binderhub:
   config:
     BinderHub:
+      pod_quota: 400
       build_node_selector: *userNodeSelector
       hub_url: https://hub.gke2.mybinder.org
       badge_base_url: https://mybinder.org
-      image_prefix: gcr.io/binderhub-288415/r2d-staging-72d7634-
-      google_analytics_code: "UA-101904940-1"
-      google_analytics_domain: "mybinder.org"
+      image_prefix: gcr.io/binderhub-288415/r2d-staging-g5b5b759-
       sticky_builds: true
 
   nodeSelector: *coreNodeSelector
@@ -74,7 +73,6 @@ binderhub:
       userScheduler:
         nodeSelector: *coreNodeSelector
 
-
 grafana:
   nodeSelector: *coreNodeSelector
   resources:
@@ -103,7 +101,6 @@ grafana:
           orgId: 1
           type: prometheus
           url: https://prometheus.mybinder.org
-          access: direct
           isDefault: true
           editable: false
   persistence:
@@ -154,6 +151,7 @@ proxyPatches:
   nodeSelector: *coreNodeSelector
 
 redirector:
+  enabled: true
   nodeSelector: *coreNodeSelector
   redirects:
     - type: host
@@ -178,6 +176,7 @@ redirector:
         to: mybinder.org/matomo/index.php
 
 matomo:
+  enabled: true
   replicas: 3
   nodeSelector: *coreNodeSelector
   db:
@@ -200,6 +199,7 @@ matomo:
       memory: 1Gi
 
 analyticsPublisher:
+  enabled: true
   project: binderhub-288415
   destinationBucket: binder-events-archive
   events:
@@ -208,6 +208,7 @@ analyticsPublisher:
     sourceBucket: binder-billing-archive
 
 gcsProxy:
+  enabled: true
   buckets:
     - name: binder-events-archive
       host: archive.analytics.mybinder.org

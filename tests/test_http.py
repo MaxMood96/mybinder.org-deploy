@@ -11,12 +11,12 @@ def test_binder_up(binder_url):
     """
     resp = requests.get(binder_url)
     assert resp.status_code == 200
-    assert 'GitHub' in resp.text
+    assert "GitHub" in resp.text
 
 
 def test_hub_health(hub_url):
     """check JupyterHubHub health endpoint"""
-    resp = requests.get(hub_url + "/hub/health")
+    resp = requests.get(hub_url + "/hub/api/health")
     print(resp.text)
     assert resp.status_code == 200
 
@@ -35,4 +35,9 @@ def test_hub_user_redirect(hub_url):
     """Requesting a Hub URL for a non-running user"""
     # this should *not* redirect for now,
     resp = requests.get(hub_url + "/user/doesntexist")
+    assert resp.status_code == 424
+    assert "Binder not found" in resp.text
+
+    resp = requests.get(hub_url + "/other/doesntexist")
     assert resp.status_code == 404
+    assert "Binder not found" in resp.text

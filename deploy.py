@@ -3,16 +3,15 @@ import argparse
 import glob
 import json
 import os
-import subprocess
 import re
+import subprocess
 import sys
-
 
 # Color codes for colored output!
 if os.environ.get("TERM"):
-    BOLD = subprocess.check_output(['tput', 'bold']).decode()
-    GREEN = subprocess.check_output(['tput', 'setaf', '2']).decode()
-    NC = subprocess.check_output(['tput', 'sgr0']).decode()
+    BOLD = subprocess.check_output(["tput", "bold"]).decode()
+    GREEN = subprocess.check_output(["tput", "setaf", "2"]).decode()
+    NC = subprocess.check_output(["tput", "sgr0"]).decode()
 else:
     # no term, no colors
     BOLD = GREEN = NC = ""
@@ -30,6 +29,9 @@ GCP_ZONES = {
     "prod": "us-central1",
 }
 
+# Mapping of cluster names (keys) to resource group names (values) for Azure deployments
+AZURE_RGs = {"turing-prod": "binder-prod", "turing-staging": "binder-staging"}
+
 
 def setup_auth_turing(cluster):
     """
@@ -37,61 +39,48 @@ def setup_auth_turing(cluster):
     """
     # Read in auth info
     azure_file = os.path.join(ABSOLUTE_HERE, "secrets", "turing-auth-key-prod.json")
-    with open(azure_file, "r") as stream:
+    with open(azure_file) as stream:
         azure = json.load(stream)
 
     # Login in to Azure
     login_cmd = [
-        "az", "login", "--service-principal",
-        "--username", azure["sp-app-id"],
-        "--password", azure["sp-app-key"],
-        "--tenant", azure["tenant-id"]
+        "az",
+        "login",
+        "--service-principal",
+        "--username",
+        azure["sp-app-id"],
+        "--password",
+        azure["sp-app-key"],
+        "--tenant",
+        azure["tenant-id"],
     ]
     subprocess.check_output(login_cmd)
 
     # Set kubeconfig
     creds_cmd = [
-        "az", "aks", "get-credentials",
-        "--name", cluster,
-        "--resource-group", "binder-prod"
-
+        "az",
+        "aks",
+        "get-credentials",
+        "--name",
+        cluster,
+        "--resource-group",
+        AZURE_RGs[cluster],
     ]
     stdout = subprocess.check_output(creds_cmd)
-    print(stdout.decode('utf-8'))
+    print(stdout.decode("utf-8"))
 
 
 def setup_auth_ovh(release, cluster):
     """
     Set up authentication with 'ovh' K8S from the ovh-kubeconfig.yml
     """
-    print(f'Setup the OVH authentication for namespace {release}')
+    print(f"Setup the OVH authentication for namespace {release}")
 
-    ovh_kubeconfig = os.path.join(ABSOLUTE_HERE, 'secrets', 'ovh-kubeconfig.yml')
-    os.environ['KUBECONFIG'] = ovh_kubeconfig
-    print(f'Current KUBECONFIG=\'{ovh_kubeconfig}\'')
-    stdout = subprocess.check_output([
-        'kubectl',
-        'config',
-        'use-context',
-        cluster
-    ])
-    print(stdout.decode('utf8'))
-
-
-def setup_ovh_ingress_link(release):
-    """
-    Setup the Ingress link ovh.mybinder.org -> binder.mybinder.ovh
-    """
-    ovh_ingress_path = os.path.join(ABSOLUTE_HERE, 'config', 'ovh', 'ovh_mybinder_org_ingress.yaml')
-    stdout = subprocess.check_output([
-        'kubectl',
-        'apply',
-        '-f',
-        ovh_ingress_path,
-        '-n',
-        release
-    ])
-    print(stdout.decode('utf8'))
+    ovh_kubeconfig = os.path.join(ABSOLUTE_HERE, "secrets", f"{release}-kubeconfig.yml")
+    os.environ["KUBECONFIG"] = ovh_kubeconfig
+    print(f"Current KUBECONFIG='{ovh_kubeconfig}'")
+    stdout = subprocess.check_output(["kubectl", "config", "use-context", cluster])
+    print(stdout.decode("utf8"))
 
 
 def setup_auth_gcloud(release, cluster=None):
@@ -99,13 +88,14 @@ def setup_auth_gcloud(release, cluster=None):
     Set up GCloud + Kubectl authentication for talking to a given cluster
     """
     # Authenticate to GoogleCloud using a service account
-    subprocess.check_output([
-        "gcloud", "auth", "activate-service-account",
-        f"--key-file=secrets/gke-auth-key-{release}.json"
-    ])
-
-    if not cluster:
-        cluster = release
+    subprocess.check_output(
+        [
+            "gcloud",
+            "auth",
+            "activate-service-account",
+            f"--key-file=secrets/gke-auth-key-{release}.json",
+        ]
+    )
 
     project = GCP_PROJECTS[release]
     zone = GCP_ZONES[release]
@@ -124,18 +114,20 @@ def setup_auth_gcloud(release, cluster=None):
     )
 
 
-def assert_helm_v3():
-    """Asserts helm is available at all and of the required major version."""
-    c = subprocess.run(["helm", "--help"], capture_output=True)
-    assert c.returncode == 0, "Helm 3 is required, but helm doesn't seem to be installed!"
+def update_networkbans(cluster):
+    """
+    Run secrets/ban.py to update network bans
+    """
 
-    c = subprocess.run(
-        ["helm", "version", "--short"],
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    assert c.returncode == 0 and "v3." in c.stdout, "Helm 3 is required, but a different version seem to be installed!"
+    print(BOLD + GREEN + f"Updating network-bans for {cluster}" + NC, flush=True)
+
+    # some members have special logic in ban.py,
+    # in which case they must be specified on the command-line
+    ban_command = [sys.executable, "secrets/ban.py"]
+    if cluster in {"turing-prod", "turing-staging", "turing", "ovh", "ovh2"}:
+        ban_command.append(cluster)
+
+    subprocess.check_call(ban_command)
 
 
 def deploy(release, name=None):
@@ -143,23 +135,12 @@ def deploy(release, name=None):
 
     The deployment is done in the following steps:
 
-        1. Run secrets/ban.py to update network bans
-        2. Deploy cert-manager
-        3. Deploy mybinder helm chart
-        4. Await deployed deployment and daemonsets to become Ready
+        1. Deploy cert-manager
+        2. Deploy mybinder helm chart
+        3. Await deployed deployment and daemonsets to become Ready
     """
     if not name:
         name = release
-
-    print(BOLD + GREEN + f"Updating network-bans for {release}" + NC, flush=True)
-
-    # some members have special logic in ban.py,
-    # in which case they must be specified on the command-line
-    ban_command = [sys.executable, "secrets/ban.py"]
-    if release in {"turing", "ovh"}:
-        ban_command.append(release)
-
-    subprocess.check_call(ban_command)
 
     setup_certmanager()
 
@@ -168,17 +149,18 @@ def deploy(release, name=None):
         "helm",
         "upgrade",
         "--install",
-        "--namespace",
-        name,
-        name,
-        "mybinder",
         "--cleanup-on-fail",
         "--create-namespace",
+        f"--namespace={name}",
+        name,
+        "mybinder",
     ]
 
     # common config files
     config_files = sorted(glob.glob(os.path.join("config", "common", "*.yaml")))
-    config_files.append(os.path.join("secrets", "config", "common.yaml"))
+    config_files.extend(
+        sorted(glob.glob(os.path.join("secrets", "config", "common", "*.yaml")))
+    )
     # release-specific config files
     for config_dir in ("config", "secrets/config"):
         config_files.append(os.path.join(config_dir, release + ".yaml"))
@@ -187,7 +169,9 @@ def deploy(release, name=None):
         helm.extend(["-f", config_file])
 
     subprocess.check_call(helm)
-    print(BOLD + GREEN + f"SUCCESS: Helm upgrade for {release} completed" + NC, flush=True)
+    print(
+        BOLD + GREEN + f"SUCCESS: Helm upgrade for {release} completed" + NC, flush=True
+    )
 
     # Explicitly wait for all deployments and daemonsets to be fully rolled out
     print(
@@ -201,12 +185,10 @@ def deploy(release, name=None):
         subprocess.check_output(
             [
                 "kubectl",
-                "--namespace",
-                name,
                 "get",
+                f"--namespace={name}",
+                "--output=name",
                 "deployments,daemonsets",
-                "-o",
-                "name",
             ]
         )
         .decode()
@@ -220,10 +202,8 @@ def deploy(release, name=None):
                 "kubectl",
                 "rollout",
                 "status",
-                "--namespace",
-                name,
-                "--timeout",
-                "10m",
+                f"--namespace={name}",
+                "--timeout=10m",
                 "--watch",
                 d,
             ]
@@ -231,52 +211,60 @@ def deploy(release, name=None):
 
 
 def setup_certmanager():
-    """Install cert-manager separately
-
-    cert-manager docs and CRD assumptions say that cert-manager must never be a sub-chart,
-    always installed on its own in a cert-manager namespace
     """
+    Install cert-manager separately into its own namespace and `kubectl apply`
+    its CRDs each time as helm won't attempt to handle changes to CRD resources.
 
-    # TODO: cert-manager chart >= 0.15
-    # has `installCRDs` option, which should eliminate the separate CRD step
-    # however, upgrade notes say this *must not* be used
-    # when upgrading, only for fresh deployments,
-    # and requires helm >=3.3.1 and kubernetes >=1.16.14
-
+    To `kubectl apply` the CRDs manually before `helm upgrade` is the typical
+    procedure recommended by cert-manager. Sometimes cert-manager provides
+    additional upgrade notes, see https://cert-manager.io/docs/release-notes/
+    before you upgrade to a new version.
+    """
     version = os.environ["CERT_MANAGER_VERSION"]
 
     manifest_url = f"https://github.com/jetstack/cert-manager/releases/download/{version}/cert-manager.crds.yaml"
     print(BOLD + GREEN + f"Installing cert-manager CRDs {version}" + NC, flush=True)
 
-    subprocess.check_call(
-        ["kubectl", "apply", "-f", manifest_url]
-    )
+    # Sometimes 'replace' is needed for upgrade (e.g. 1.1->1.2)
+    subprocess.check_call(["kubectl", "apply", "-f", manifest_url])
 
     print(BOLD + GREEN + f"Installing cert-manager {version}" + NC, flush=True)
-    subprocess.check_call(
-        ["helm", "repo", "add", "jetstack", "https://charts.jetstack.io"]
-    )
-
-    subprocess.check_call(
-        ["helm", "repo", "update"]
-    )
-
     helm_upgrade = [
         "helm",
         "upgrade",
         "--install",
         "--create-namespace",
-        "--namespace",
+        "--namespace=cert-manager",
+        "--repo=https://charts.jetstack.io",
         "cert-manager",
         "cert-manager",
-        "jetstack/cert-manager",
-        "--version",
-        version,
-        "-f",
-        "config/cert-manager.yaml",
+        f"--version={version}",
+        "--values=config/cert-manager.yaml",
     ]
 
     subprocess.check_call(helm_upgrade)
+
+
+def patch_coredns():
+    """Patch coredns resource allocation
+
+    OVH2 coredns does not have sufficient memory by default after our ban patches
+    """
+    print(BOLD + GREEN + "Patching coredns resources" + NC, flush=True)
+    subprocess.check_call(
+        [
+            "kubectl",
+            "set",
+            "resources",
+            "-n",
+            "kube-system",
+            "deployments/coredns",
+            "--limits",
+            "memory=250Mi",
+            "--requests",
+            "memory=200Mi",
+        ]
+    )
 
 
 def main():
@@ -285,23 +273,36 @@ def main():
     argparser.add_argument(
         "release",
         help="Release to deploy",
-        choices=["staging", "prod", "ovh", "turing"],
+        choices=[
+            "staging",
+            "prod",
+            "ovh",
+            "ovh2",
+            "turing-prod",
+            "turing-staging",
+            "turing",
+        ],
     )
     argparser.add_argument(
-        "--name", help="Override helm release name, if different from RELEASE",
+        "--name",
+        help="Override helm release name, if different from RELEASE",
     )
     argparser.add_argument(
-        "cluster", help="Cluster to do the deployment in", nargs="?", type=str,
+        "cluster",
+        help="Cluster to do the deployment in",
+        nargs="?",
+        type=str,
     )
     argparser.add_argument(
-        '--local',
-        action='store_true',
-        help="If the script is running locally, skip auth step"
+        "--local",
+        action="store_true",
+        help="If the script is running locally, skip auth step",
     )
 
     args = argparser.parse_args()
 
-    assert_helm_v3()
+    # if one argument given make cluster == release
+    cluster = args.cluster or args.release
 
     # Check if the local flag is set
     if not args.local:
@@ -327,20 +328,23 @@ def main():
                 pass
             else:
                 # User wrote something that wasn't "yes" or "no"
-                raise ValueError(
-                    "Unrecognised input. Expecting either yes or no."
-                )
+                raise ValueError("Unrecognised input. Expecting either yes or no.")
 
         # script is running on CI, proceed with auth and helm setup
-        if args.cluster == 'ovh':
-            setup_auth_ovh(args.release, args.cluster)
-        elif args.cluster == 'turing':
-            setup_auth_turing(args.release)
-        else:
-            setup_auth_gcloud(args.release, args.cluster)
 
+        if cluster.startswith("ovh"):
+            setup_auth_ovh(args.release, cluster)
+            patch_coredns()
+        elif cluster in AZURE_RGs:
+            setup_auth_turing(cluster)
+        elif cluster in GCP_PROJECTS:
+            setup_auth_gcloud(args.release, cluster)
+        else:
+            raise Exception("Cloud cluster not recognised!")
+
+    update_networkbans(cluster)
     deploy(args.release, args.name)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

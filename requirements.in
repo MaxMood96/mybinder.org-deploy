@@ -1,0 +1,8 @@
+chartpress==2.1.*
+kubernetes
+pytest
+pytest-rerunfailures
+pytest-timeout
+pytest-xdist
+pyyaml
+requests

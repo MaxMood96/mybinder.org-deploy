@@ -12,14 +12,14 @@ provider "google" {
 }
 
 locals {
-  gke_version = "1.17.14-gke.400"
+  gke_version = "1.19.14-gke.1900"
 }
 
 module "mybinder" {
-  source = "../modules/mybinder"
-
+  source             = "../modules/mybinder"
   name               = "staging"
   gke_master_version = local.gke_version
+  federation_members = ["turing-staging"]
 }
 
 # define node pools here, too hard to encode with variables
@@ -49,6 +49,13 @@ resource "google_container_node_pool" "pool" {
       disable-legacy-endpoints = "true"
     }
   }
+  # do not recreate pools that have been auto-upgraded
+
+  lifecycle {
+    ignore_changes = [
+      version
+    ]
+  }
 }
 
 # output "public_ip" {
@@ -67,3 +74,7 @@ output "matomo_password" {
   sensitive = true
 }
 
+output "events_archiver_keys" {
+  value     = module.mybinder.events_archiver_keys
+  sensitive = true
+}

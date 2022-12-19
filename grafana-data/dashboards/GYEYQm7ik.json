@@ -3,6 +3,7 @@
   "annotations": {
    "list": [
     {
+     "$$hashKey": "object:58",
      "builtIn": 1,
      "datasource": "-- Grafana --",
      "enable": true,
@@ -12,6 +13,7 @@
      "type": "dashboard"
     },
     {
+     "$$hashKey": "object:59",
      "datasource": "-- Grafana --",
      "enable": true,
      "hide": false,
@@ -29,8 +31,8 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 2,
-  "iteration": 1571916579736,
+  "id": 6,
+  "iteration": 1622666494848,
   "links": [],
   "panels": [
    {
@@ -47,6 +49,7 @@
      "x": 0,
      "y": 0
     },
+    "hiddenSeries": false,
     "id": 4,
     "legend": {
      "avg": false,
@@ -74,7 +77,7 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(rate(container_cpu_usage_seconds_total{pod_name=~\"hub-.*\"}[2m]))",
+      "expr": "sum(irate(container_cpu_usage_seconds_total{pod=~\"hub-.*\", container!=\"\"}[2m])) by (pod)",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
@@ -145,6 +148,7 @@
      "x": 8,
      "y": 0
     },
+    "hiddenSeries": false,
     "id": 2,
     "legend": {
      "avg": true,
@@ -172,11 +176,11 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(rate(container_cpu_usage_seconds_total{pod_name=~\"binder-.*\"}[2m])) by (pod_name)",
+      "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"binder-.*\", container!=\"\"}[2m])) by (pod)",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
-      "legendFormat": "{{pod_name}}",
+      "legendFormat": "{{ pod }}",
       "refId": "A"
      }
     ],
@@ -243,10 +247,13 @@
      "x": 16,
      "y": 0
     },
+    "hiddenSeries": false,
     "id": 3,
     "legend": {
      "avg": false,
      "current": false,
+     "hideEmpty": true,
+     "hideZero": true,
      "max": false,
      "min": false,
      "show": true,
@@ -270,11 +277,11 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(rate(container_cpu_usage_seconds_total{pod_name=~\"proxy-.*\"}[2m])) by (container_name)",
+      "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"proxy-.*\", container!=\"\"}[2m])) by (container)",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
-      "legendFormat": "{{container_name}}",
+      "legendFormat": "{{ container }}",
       "refId": "A"
      }
     ],
@@ -298,6 +305,7 @@
     },
     "yaxes": [
      {
+      "$$hashKey": "object:116",
       "format": "percentunit",
       "label": null,
       "logBase": 1,
@@ -306,6 +314,7 @@
       "show": true
      },
      {
+      "$$hashKey": "object:117",
       "format": "short",
       "label": null,
       "logBase": 1,
@@ -333,6 +342,7 @@
      "x": 0,
      "y": 7
     },
+    "hiddenSeries": false,
     "id": 1,
     "legend": {
      "avg": false,
@@ -360,7 +370,7 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(container_memory_rss{pod_name=~\"hub-.*\"})",
+      "expr": "sum(container_memory_rss{pod=~\"hub-.*\",container!=\"\"})",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
@@ -431,6 +441,7 @@
      "x": 8,
      "y": 7
     },
+    "hiddenSeries": false,
     "id": 6,
     "legend": {
      "avg": false,
@@ -458,11 +469,11 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(container_memory_rss{pod_name=~\"binder-.*\"}) by (pod_name)",
+      "expr": "sum(container_memory_rss{pod=~\"binder-.*\",container!=\"\"}) by (pod)",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
-      "legendFormat": "{{pod_name}}",
+      "legendFormat": "{{ pod }}",
       "refId": "A"
      }
     ],
@@ -472,7 +483,8 @@
       "fill": true,
       "line": true,
       "op": "gt",
-      "value": 1500000000
+      "value": 1500000000,
+      "yaxis": "left"
      }
     ],
     "timeFrom": null,
@@ -529,10 +541,13 @@
      "x": 16,
      "y": 7
     },
+    "hiddenSeries": false,
     "id": 5,
     "legend": {
      "avg": false,
      "current": false,
+     "hideEmpty": true,
+     "hideZero": true,
      "max": false,
      "min": false,
      "show": true,
@@ -552,15 +567,15 @@
     "renderer": "flot",
     "seriesOverrides": [],
     "spaceLength": 10,
-    "stack": false,
+    "stack": true,
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(container_memory_rss{pod_name=~\"proxy-.*\"}) by (container_name)",
+      "expr": "sum(container_memory_rss{pod=~\"proxy-.*\", container!=\"\"}) by (container)",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
-      "legendFormat": "{{container_name}}",
+      "legendFormat": "{{ container }}",
       "refId": "A"
      }
     ],
@@ -619,6 +634,7 @@
      "x": 0,
      "y": 14
     },
+    "hiddenSeries": false,
     "id": 7,
     "legend": {
      "avg": false,
@@ -646,7 +662,7 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(container_memory_rss{pod_name=~\"prod-dind-.*\"}) by (instance)",
+      "expr": "sum(container_memory_rss{pod=~\"prod-dind-.*\",container!=\"\"}) by (instance)",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
@@ -709,6 +725,7 @@
      "x": 8,
      "y": 14
     },
+    "hiddenSeries": false,
     "id": 8,
     "legend": {
      "avg": false,
@@ -736,7 +753,7 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(container_memory_rss{pod_name=~\"[[:alnum:]]+-grafana-.*\"})",
+      "expr": "sum(container_memory_rss{pod=~\"[[:alnum:]]+-grafana-.*\",container!=\"\"})",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
@@ -799,6 +816,7 @@
      "x": 16,
      "y": 14
     },
+    "hiddenSeries": false,
     "id": 9,
     "legend": {
      "avg": false,
@@ -826,7 +844,7 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(container_memory_rss{pod_name=~\"[[:alnum:]]+-prometheus-server-.*\"}) ",
+      "expr": "sum(container_memory_rss{pod=~\"[[:alnum:]]+-prometheus-server-.*\",container!=\"\"}) ",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
@@ -889,6 +907,7 @@
      "x": 0,
      "y": 21
     },
+    "hiddenSeries": false,
     "id": 10,
     "legend": {
      "avg": false,
@@ -916,7 +935,7 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(rate(container_cpu_usage_seconds_total{pod_name=~\"prod-dind-.*\"}[2m])) by (instance)",
+      "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"prod-dind-.*\",container!=\"\"}[2m])) by (instance)",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
@@ -979,6 +998,7 @@
      "x": 8,
      "y": 21
     },
+    "hiddenSeries": false,
     "id": 11,
     "legend": {
      "avg": false,
@@ -1006,7 +1026,7 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(rate(container_cpu_usage_seconds_total{pod_name=~\"[[:alnum:]]+-grafana-.*\"}[2m]))",
+      "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"[[:alnum:]]+-grafana-.*\",container!=\"\"}[2m]))",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
@@ -1069,6 +1089,7 @@
      "x": 16,
      "y": 21
     },
+    "hiddenSeries": false,
     "id": 12,
     "legend": {
      "avg": false,
@@ -1096,7 +1117,7 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(rate(container_cpu_usage_seconds_total{pod_name=~\"[[:alnum:]]+-prometheus-server-.*\"}[2m]))",
+      "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"[[:alnum:]]+-prometheus-server-.*\",container!=\"\"}[2m]))",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
@@ -1159,6 +1180,7 @@
      "x": 0,
      "y": 28
     },
+    "hiddenSeries": false,
     "id": 13,
     "legend": {
      "avg": false,
@@ -1186,11 +1208,11 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(rate(container_cpu_usage_seconds_total{pod_name=~\"[[:alnum:]]+-nginx-ingress-controller-.*\"}[2m])) by (pod_name)",
+      "expr": "sum(irate(container_cpu_usage_seconds_total{pod=~\"[[:alnum:]-]+-ingress[[:alnum:]-]+controller-.*\",container!=\"\"}[2m])) by (pod)",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
-      "legendFormat": "{{pod_name}}",
+      "legendFormat": "{{pod}}",
       "refId": "A"
      }
     ],
@@ -1241,15 +1263,18 @@
     "dashLength": 10,
     "dashes": false,
     "datasource": "$cluster",
+    "description": "The amount of storage being used by prometheus\n\nadjust prometheus storage size and retention to avoid filling up",
     "fill": 1,
     "fillGradient": 0,
     "gridPos": {
      "h": 7,
-     "w": 12,
-     "x": 12,
+     "w": 8,
+     "x": 16,
      "y": 28
     },
-    "id": 14,
+    "hiddenSeries": false,
+    "id": 18,
+    "interval": "",
     "legend": {
      "avg": false,
      "current": false,
@@ -1261,26 +1286,25 @@
     },
     "lines": true,
     "linewidth": 1,
-    "links": [],
     "nullPointMode": "null",
     "options": {
      "dataLinks": []
     },
     "percentage": false,
-    "pointradius": 5,
+    "pointradius": 2,
     "points": false,
     "renderer": "flot",
+    "repeat": null,
+    "repeatDirection": null,
     "seriesOverrides": [],
     "spaceLength": 10,
     "stack": false,
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(container_memory_rss{pod_name=~\"[[:alnum:]]+-nginx-ingress-controller-.*\"}) by (pod_name)",
-      "format": "time_series",
+      "expr": "prometheus_tsdb_storage_blocks_bytes",
       "interval": "",
-      "intervalFactor": 2,
-      "legendFormat": "{{pod_name}}",
+      "legendFormat": "prometheus storage",
       "refId": "A"
      }
     ],
@@ -1288,7 +1312,7 @@
     "timeFrom": null,
     "timeRegions": [],
     "timeShift": null,
-    "title": "nginx Ingress Memory usage",
+    "title": "Prometheus storage",
     "tooltip": {
      "shared": true,
      "sort": 0,
@@ -1304,7 +1328,8 @@
     },
     "yaxes": [
      {
-      "format": "bytes",
+      "$$hashKey": "object:178",
+      "format": "decbytes",
       "label": null,
       "logBase": 1,
       "max": null,
@@ -1312,6 +1337,7 @@
       "show": true
      },
      {
+      "$$hashKey": "object:179",
       "format": "short",
       "label": null,
       "logBase": 1,
@@ -1339,6 +1365,7 @@
      "x": 0,
      "y": 35
     },
+    "hiddenSeries": false,
     "id": 15,
     "legend": {
      "avg": false,
@@ -1366,11 +1393,11 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(rate(container_cpu_usage_seconds_total{pod_name=~\"user-scheduler-.*\"}[2m])) by (pod_name)",
+      "expr": "sum(irate(container_cpu_usage_seconds_total{pod=~\"user-scheduler-.*\",container!=\"\"}[2m])) by (pod)",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
-      "legendFormat": "{{pod_name}}",
+      "legendFormat": "{{ pod }}",
       "refId": "A"
      }
     ],
@@ -1429,6 +1456,98 @@
      "x": 12,
      "y": 35
     },
+    "hiddenSeries": false,
+    "id": 14,
+    "legend": {
+     "avg": false,
+     "current": false,
+     "max": false,
+     "min": false,
+     "show": true,
+     "total": false,
+     "values": false
+    },
+    "lines": true,
+    "linewidth": 1,
+    "links": [],
+    "nullPointMode": "null",
+    "options": {
+     "dataLinks": []
+    },
+    "percentage": false,
+    "pointradius": 5,
+    "points": false,
+    "renderer": "flot",
+    "seriesOverrides": [],
+    "spaceLength": 10,
+    "stack": false,
+    "steppedLine": false,
+    "targets": [
+     {
+      "expr": "sum(container_memory_rss{pod=~\"[[:alnum:]-]+-ingress[[:alnum:]-]+controller-.*\",container!=\"\"}) by (pod)",
+      "format": "time_series",
+      "interval": "",
+      "intervalFactor": 2,
+      "legendFormat": "{{pod}}",
+      "refId": "A"
+     }
+    ],
+    "thresholds": [],
+    "timeFrom": null,
+    "timeRegions": [],
+    "timeShift": null,
+    "title": "nginx Ingress Memory usage",
+    "tooltip": {
+     "shared": true,
+     "sort": 0,
+     "value_type": "individual"
+    },
+    "type": "graph",
+    "xaxis": {
+     "buckets": null,
+     "mode": "time",
+     "name": null,
+     "show": true,
+     "values": []
+    },
+    "yaxes": [
+     {
+      "format": "bytes",
+      "label": null,
+      "logBase": 1,
+      "max": null,
+      "min": "0",
+      "show": true
+     },
+     {
+      "format": "short",
+      "label": null,
+      "logBase": 1,
+      "max": null,
+      "min": null,
+      "show": true
+     }
+    ],
+    "yaxis": {
+     "align": false,
+     "alignLevel": null
+    }
+   },
+   {
+    "aliasColors": {},
+    "bars": false,
+    "dashLength": 10,
+    "dashes": false,
+    "datasource": "$cluster",
+    "fill": 1,
+    "fillGradient": 0,
+    "gridPos": {
+     "h": 7,
+     "w": 12,
+     "x": 12,
+     "y": 42
+    },
+    "hiddenSeries": false,
     "id": 16,
     "legend": {
      "avg": false,
@@ -1456,11 +1575,11 @@
     "steppedLine": false,
     "targets": [
      {
-      "expr": "sum(container_memory_rss{pod_name=~\"user-scheduler-.*\"}) by (pod_name)",
+      "expr": "sum(container_memory_rss{pod=~\"user-scheduler-.*\",container!=\"\"}) by (pod)",
       "format": "time_series",
       "interval": "",
       "intervalFactor": 2,
-      "legendFormat": "{{pod_name}}",
+      "legendFormat": "{{ pod }}",
       "refId": "A"
      }
     ],
@@ -1507,7 +1626,7 @@
    }
   ],
   "refresh": "1m",
-  "schemaVersion": 20,
+  "schemaVersion": 22,
   "style": "dark",
   "tags": [],
   "templating": {
@@ -1533,7 +1652,7 @@
    ]
   },
   "time": {
-   "from": "now-2d",
+   "from": "now-1h",
    "to": "now"
   },
   "timepicker": {
@@ -1564,14 +1683,17 @@
   "timezone": "",
   "title": "Components Resource Metrics",
   "uid": "GYEYQm7ik",
-  "version": 12
+  "variables": {
+   "list": []
+  },
+  "version": 14
  },
  "meta": {
   "canAdmin": true,
   "canEdit": true,
   "canSave": true,
   "canStar": true,
-  "created": "2018-05-08T14:10:20Z",
+  "created": "2020-09-22T09:29:52Z",
   "createdBy": "admin",
   "expires": "0001-01-01T00:00:00Z",
   "folderId": 0,
@@ -1583,9 +1705,9 @@
   "provisionedExternalId": "",
   "slug": "components-resource-metrics",
   "type": "db",
-  "updated": "2019-10-24T11:34:10Z",
+  "updated": "2021-06-02T20:51:10Z",
   "updatedBy": "admin",
   "url": "/d/GYEYQm7ik/components-resource-metrics",
-  "version": 12
+  "version": 14
  }
 }

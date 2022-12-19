@@ -5,7 +5,7 @@
 #
 # This is a separate path-whitelisted ingress rather than just
 # a domain alias to prevent possible reflection attacks.
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: static
@@ -18,21 +18,23 @@ metadata:
     {{- end }}
 spec:
   rules:
-    {{ $root := . }}
-    {{ range $host := .Values.static.ingress.hosts }}
+    {{- range $host := .Values.static.ingress.hosts }}
     - host: {{ $host }}
       http:
         paths:
-          {{ range $path := $root.Values.static.paths }}
+          {{- range $path := $.Values.static.paths }}
           - path: {{ $path }}
+            pathType: Prefix
             backend:
-              serviceName: binder
-              servicePort: 80
-          {{ end }}
-    {{ end }}
+              service:
+                name: binder
+                port:
+                  number: 80
+          {{- end }}
+    {{- end }}
   tls:
     - secretName: {{ .Values.static.ingress.tls.secretName }}
       hosts:
-      {{ range $host := .Values.static.ingress.hosts }}
-      - {{ $host }}
-      {{- end }}
+        {{- range $host := .Values.static.ingress.hosts }}
+        - {{ $host }}
+        {{- end }}

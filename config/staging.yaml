@@ -3,14 +3,14 @@ projectName: binderhub-288415
 binderhub:
   config:
     BinderHub:
+      pod_quota: 20
       hub_url: https://hub.gke2.staging.mybinder.org
       badge_base_url: https://staging.mybinder.org
-      image_prefix: gcr.io/binderhub-288415/r2d-staging-72d7634-
+      image_prefix: gcr.io/binderhub-288415/r2d-staging-g5b5b759-
       sticky_builds: true
       build_memory_limit: "2G"
   extraEnv:
-    - name: EVENT_LOG_NAME
-      value: "binderhub-staging-events-text"
+    EVENT_LOG_NAME: "binderhub-staging-events-text"
 
   resources:
     requests:
@@ -111,6 +111,7 @@ static:
       - static.gke2.staging.mybinder.org
 
 redirector:
+  enabled: true
   redirects:
     - type: host
       host:
@@ -142,6 +143,7 @@ analyticsPublisher:
     sourceBucket: binder-billing-archive
 
 gcsProxy:
+  enabled: true
   buckets:
     - name: binder-staging-events-archive
       host: archive.analytics.gke2.staging.mybinder.org
@@ -163,4 +165,7 @@ federationRedirect:
     ovh:
       weight: 0
     turing:
-      weight: 0
+      url: https://binder-staging.mybinder.turing.ac.uk
+      weight: 4
+      health: https://binder-staging.mybinder.turing.ac.uk/health
+      versions: https://binder-staging.mybinder.turing.ac.uk/versions
