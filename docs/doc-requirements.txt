@@ -2,3 +2,4 @@ sphinx==4.1.2
 recommonmark==0.7.1
 pydata-sphinx-theme==0.6.3
 docutils==0.16 # 0.17 breaks https://github.com/readthedocs/recommonmark/issues/220
+setuptools>=70.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
